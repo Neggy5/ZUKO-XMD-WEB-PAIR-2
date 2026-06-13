@@ -1,5 +1,11 @@
 /**
  * ZUKO XMD — index.js
+ * Baileys v6.7.18 — permanent stable build
+ *
+ * Fixes:
+ *  - Sessions auto-restored on Railway restart (no re-pairing needed)
+ *  - uncaughtException + unhandledRejection kept alive (no silent crashes)
+ *  - Graceful SIGTERM closes WA sockets cleanly before exit
  */
 
 const express          = require('express');
@@ -16,13 +22,13 @@ const io         = new Server(httpServer, { cors: { origin: '*', methods: ['GET'
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // FIXED: removed ../
+app.use(express.static(path.join(__dirname, '../public')));
 
 const sessions = new Map();
-const AUTH_DIR = path.join(__dirname, 'sessions'); // FIXED: removed ../
+const AUTH_DIR = path.join(__dirname, '../sessions');
 
 // ── Routes ─────────────────────────────────────────────────────────────────
-app.get('/',       (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html'))); // FIXED
+app.get('/',       (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')));
 app.get('/health', (req, res) => res.json({ status: 'alive', bot: 'ZUKO XMD', version: '2.0.0' }));
 app.get('/api/sessions', (req, res) => {
   const active = [...sessions.entries()]
@@ -48,12 +54,6 @@ io.on('connection', (socket) => {
       sessions.delete(phone);
     }
 
-    // Clear old session folder
-    const sessionDir = path.join(AUTH_DIR, phone);
-    if (fs.existsSync(sessionDir)) {
-      try { fs.rmSync(sessionDir, { recursive: true, force: true }); } catch (_) {}
-    }
-
     socket.emit('status', { message: '⚡ Initializing ZUKO XMD...', type: 'info' });
     try {
       await startZukoBot(phone, socket, io, sessions);
@@ -69,6 +69,8 @@ io.on('connection', (socket) => {
 });
 
 // ── Auto-restore sessions on boot ──────────────────────────────────────────
+// When Railway restarts the container, any saved session (creds.json on disk)
+// is automatically reconnected — no manual re-pairing needed.
 async function restoreSessions() {
   if (!fs.existsSync(AUTH_DIR)) return;
 
@@ -112,10 +114,13 @@ function shutdown(sig) {
     try { session.sock?.end(); } catch (_) {}
   }
   httpServer.close(() => process.exit(0));
+  // Force exit after 8s if httpServer.close() hangs
   setTimeout(() => process.exit(0), 8000);
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT',  () => shutdown('SIGINT'));
+
+// Keep alive on unhandled errors — log but never crash
 process.on('uncaughtException',  err  => console.error('[ZUKO XMD] uncaughtException:', err.message));
 process.on('unhandledRejection', reason => console.error('[ZUKO XMD] unhandledRejection:', reason));
