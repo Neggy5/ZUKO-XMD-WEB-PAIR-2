@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZUKO XMD — Link Device</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Tokens ── */
+    :root {
+      --bg0:      #05060f;   /* near-black with blue tinge */
+      --bg1:      #0a0d1a;   /* panel bg */
+      --bg2:      #0f1326;   /* input bg */
+      --violet:   #8b5cf6;   /* primary neon */
+      --violet-d: #6d28d9;
+      --cyan:     #22d3ee;   /* secondary neon */
+      --cyan-d:   #0891b2;
+      --green:    #4ade80;   /* success */
+      --red:      #f87171;   /* error */
+      --amber:    #fbbf24;   /* warning / code */
+      --text:     #e2e8f0;
+      --muted:    #475569;
+      --border:   #1e2a45;
+      --border-hi:#2d3f66;
+      --mono:     'Share Tech Mono', monospace;
+      --sans:     'Inter', sans-serif;
+      --glow-v:   0 0 20px rgba(139,92,246,.5);
+      --glow-c:   0 0 20px rgba(34,211,238,.5);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg0);
+      color: var(--text);
+      font-family: var(--sans);
+      overflow-x: hidden;
+    }
+
+    /* ── Scanline overlay ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,.08) 2px,
+        rgba(0,0,0,.08) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── Grid bg ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(139,92,246,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34,211,238,.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    /* ── Layout ── */
+    .wrap {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px 20px;
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 440px;
+    }
+
+    /* ── Header ── */
+    .hdr {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .logo-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--violet), var(--cyan));
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      box-shadow: var(--glow-v);
+      animation: logopulse 4s ease-in-out infinite;
+    }
+
+    @keyframes logopulse {
+      0%, 100% { box-shadow: var(--glow-v); }
+      50%       { box-shadow: var(--glow-c); }
+    }
+
+    .logo-name {
+      font-family: var(--mono);
+      font-size: 26px;
+      font-weight: 400;
+      letter-spacing: 2px;
+      background: linear-gradient(90deg, var(--violet), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hdr-sub {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    /* ── Status pill ── */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 12px;
+      padding: 5px 14px;
+      border: 1px solid rgba(139,92,246,.25);
+      border-radius: 100px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--violet);
+      background: rgba(139,92,246,.06);
+    }
+
+    .pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .2; }
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(139,92,246,.06) inset,
+        0 24px 64px rgba(0,0,0,.6);
+    }
+
+    .card-top {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--violet);
+      text-transform: uppercase;
+    }
+
+    .card-badge {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 1px;
+      color: var(--muted);
+    }
+
+    .card-body {
+      padding: 24px;
+    }
+
+    /* ── Input area ── */
+    .field-lbl {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .phone-input {
+      flex: 1;
+      background: var(--bg2);
+      border: 1px solid var(--border-hi);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-family: var(--mono);
+      font-size: 15px;
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      caret-color: var(--cyan);
+    }
+
+    .phone-input::placeholder { color: var(--muted); }
+
+    .phone-input:focus {
+      border-color: var(--violet);
+      box-shadow: 0 0 0 3px rgba(139,92,246,.15), var(--glow-v);
+    }
+
+    .btn-link {
+      padding: 12px 18px;
+      background: linear-gradient(135deg, var(--violet), var(--cyan));
+      border: none;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: #fff;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity .2s, box-shadow .2s;
+      box-shadow: var(--glow-v);
+      letter-spacing: 1px;
+    }
+
+    .btn-link:hover { opacity: .88; box-shadow: var(--glow-c); }
+    .btn-link:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
+
+    .hint {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    /* ── Terminal log ── */
+    .term {
+      margin-top: 20px;
+      background: #040508;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .term-bar {
+      padding: 7px 14px;
+      background: rgba(255,255,255,.02);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .term-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+    .term-dot:nth-child(1) { background: #ff5f57; }
+    .term-dot:nth-child(2) { background: #ffbd2e; }
+    .term-dot:nth-child(3) { background: #28c840; }
+
+    .term-title {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      margin-left: 6px;
+    }
+
+    .term-body {
+      padding: 12px 14px;
+      min-height: 80px;
+      max-height: 160px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .term-body::-webkit-scrollbar { width: 3px; }
+    .term-body::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+    .log-line { display: flex; gap: 8px; }
+    .log-line .pfx { color: var(--muted); flex-shrink: 0; }
+    .log-line.info    .msg { color: #94a3b8; }
+    .log-line.success .msg { color: var(--green); }
+    .log-line.warning .msg { color: var(--amber); }
+    .log-line.error   .msg { color: var(--red); }
+    .log-line.code    .msg { color: var(--cyan); }
+
+    /* ── Pairing code section ── */
+    #code-section {
+      display: none;
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    .code-eyebrow {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    /* Signature element: glitch-flicker code display */
+    .code-box {
+      position: relative;
+      display: inline-block;
+      cursor: pointer;
+    }
+
+    .code-display {
+      font-family: var(--mono);
+      font-size: clamp(28px, 7vw, 40px);
+      font-weight: 400;
+      letter-spacing: 8px;
+      color: var(--amber);
+      background: rgba(251,191,36,.05);
+      border: 1px solid rgba(251,191,36,.2);
+      border-radius: 10px;
+      padding: 14px 22px;
+      display: block;
+      text-shadow: 0 0 24px rgba(251,191,36,.6);
+      transition: background .2s;
+      min-width: 240px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Sweeping neon line across code */
+    .code-display::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 60%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(251,191,36,.12), transparent);
+      animation: sweep 2.4s ease-in-out infinite;
+    }
+
+    @keyframes sweep {
+      0%   { left: -60%; }
+      100% { left: 160%; }
+    }
+
+    .code-box:hover .code-display { background: rgba(251,191,36,.09); }
+
+    .copy-tip {
+      margin-top: 8px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+
+    /* Copied flash */
+    .code-display.copied {
+      background: rgba(74,222,128,.1) !important;
+      border-color: rgba(74,222,128,.3) !important;
+      color: var(--green) !important;
+      text-shadow: 0 0 24px rgba(74,222,128,.5) !important;
+    }
+
+    /* ── Steps ── */
+    .steps {
+      margin-top: 14px;
+      background: rgba(34,211,238,.03);
+      border: 1px solid rgba(34,211,238,.1);
+      border-radius: 8px;
+      padding: 14px 16px;
+      text-align: left;
+    }
+
+    .steps ol {
+      list-style: none;
+      counter-reset: steps;
+    }
+
+    .steps li {
+      counter-increment: steps;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.9;
+    }
+
+    .steps li::before {
+      content: counter(steps, decimal-leading-zero);
+      color: var(--cyan);
+      flex-shrink: 0;
+      font-size: 10px;
+    }
+
+    .steps li strong { color: var(--text); }
+
+    /* ── Connected section ── */
+    #connected-section {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .conn-card {
+      background: rgba(74,222,128,.04);
+      border: 1px solid rgba(74,222,128,.18);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .conn-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .conn-name {
+      font-family: var(--mono);
+      font-size: 17px;
+      color: var(--green);
+      text-shadow: 0 0 20px rgba(74,222,128,.4);
+    }
+
+    .conn-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      font-family: var(--mono);
+    }
+
+    .btn-reset {
+      margin-top: 14px;
+      padding: 8px 18px;
+      background: transparent;
+      border: 1px solid var(--border-hi);
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: border-color .2s, color .2s;
+    }
+
+    .btn-reset:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 28px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--muted);
+    }
+
+    footer .hi { color: var(--violet); }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .input-row { flex-direction: column; }
+      .btn-link  { width: 100%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+
+      <!-- Header -->
+      <div class="hdr">
+        <div class="logo">
+          <div class="logo-mark">⚡</div>
+          <span class="logo-name">ZUKO XMD</span>
+        </div>
+        <p class="hdr-sub">WhatsApp Device Pairing</p>
+        <div class="pill">
+          <span class="pill-dot"></span>
+          SYSTEM ONLINE
+        </div>
+      </div>
+
+      <!-- Main card -->
+      <div class="card">
+        <div class="card-top">
+          <span class="card-label">◈ Link Device</span>
+          <span class="card-badge">BAILEYS v6.7.18</span>
+        </div>
+        <div class="card-body">
+
+          <label class="field-lbl" for="phone">Phone Number</label>
+          <div class="input-row">
+            <input
+              type="tel"
+              id="phone"
+              class="phone-input"
+              placeholder="2348012345678"
+              autocomplete="off"
+              inputmode="numeric"
+            />
+            <button class="btn-link" id="pairBtn" onclick="requestPairing()">
+              GET CODE
+            </button>
+          </div>
+          <p class="hint">// country code · no spaces · no + sign</p>
+
+          <!-- Terminal log -->
+          <div class="term">
+            <div class="term-bar">
+              <span class="term-dot"></span>
+              <span class="term-dot"></span>
+              <span class="term-dot"></span>
+              <span class="term-title">OUTPUT</span>
+            </div>
+            <div class="term-body" id="log">
+              <div class="log-line info">
+                <span class="pfx">›</span>
+                <span class="msg">Waiting for input...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pairing code -->
+          <div id="code-section">
+            <p class="code-eyebrow">// pairing code</p>
+            <div class="code-box" onclick="copyCode()" title="Click to copy">
+              <span class="code-display" id="code-display">————</span>
+            </div>
+            <p class="copy-tip">CLICK TO COPY · EXPIRES IN ~60s</p>
+            <div class="steps">
+              <ol>
+                <li>Open <strong>WhatsApp</strong> on your phone</li>
+                <li>Tap <strong>⋮ Menu → Linked Devices</strong></li>
+                <li>Tap <strong>Link a Device</strong></li>
+                <li>Tap <strong>Link with Phone Number</strong></li>
+                <li>Enter the code above</li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- Connected -->
+          <div id="connected-section">
+            <div class="conn-card">
+              <span class="conn-icon">✅</span>
+              <div class="conn-name" id="connected-name">Connected</div>
+              <div class="conn-sub">ZUKO XMD is live on your WhatsApp</div>
+            </div>
+            <div style="text-align:center">
+              <button class="btn-reset" onclick="resetSession()">DISCONNECT</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <footer>
+        ZUKO XMD &nbsp;·&nbsp; <span class="hi">BAILEYS</span> &nbsp;·&nbsp; RAILWAY
+      </footer>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let currentCode = '';
+
+    const logEl    = document.getElementById('log');
+    const pairBtn  = document.getElementById('pairBtn');
+    const codeEl   = document.getElementById('code-display');
+    const codeSec  = document.getElementById('code-section');
+    const connSec  = document.getElementById('connected-section');
+    const connName = document.getElementById('connected-name');
+
+    // ── Terminal log ────────────────────────────────────────────────────────
+    function addLog(text, type = 'info') {
+      // Remove placeholder on first real message
+      const placeholder = logEl.querySelector('.log-line');
+      if (placeholder?.querySelector('.msg')?.textContent === 'Waiting for input...') {
+        placeholder.remove();
+      }
+      const line = document.createElement('div');
+      line.className = `log-line ${type}`;
+      line.innerHTML = `<span class="pfx">›</span><span class="msg">${esc(text)}</span>`;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Signature: decrypt-flicker reveal ──────────────────────────────────
+    const CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#@$%!?';
+    function flickerReveal(finalCode) {
+      const parts  = finalCode.split('-');        // e.g. ['A1B2','C3D4']
+      const joined = finalCode.replace(/-/g,'');  // 'A1B2C3D4'
+      let frame = 0;
+      const total = 18;
+
+      const tick = () => {
+        if (frame >= total) {
+          codeEl.textContent = finalCode;
+          return;
+        }
+        const progress = frame / total;
+        let display = '';
+        for (let i = 0; i < joined.length; i++) {
+          // Reveal left→right as frames progress
+          if (i < Math.floor(progress * joined.length)) {
+            display += joined[i];
+          } else {
+            display += CHARS[Math.floor(Math.random() * CHARS.length)];
+          }
+          // Re-insert dashes at correct positions
+          if (parts.length > 1) {
+            let pos = 0;
+            for (let p = 0; p < parts.length - 1; p++) {
+              pos += parts[p].length;
+              if (i + 1 === pos) display += '-';
+            }
+          }
+        }
+        codeEl.textContent = display;
+        frame++;
+        setTimeout(tick, 55);
+      };
+      tick();
+    }
+
+    function showCode(code) {
+      currentCode = code;
+      codeSec.style.display = 'block';
+      connSec.style.display = 'none';
+      flickerReveal(code);
+    }
+
+    function showConnected(name) {
+      connName.textContent = name || 'Connected';
+      connSec.style.display = 'block';
+      codeSec.style.display = 'none';
+      pairBtn.disabled = false;
+      pairBtn.textContent = 'LINKED ✓';
+    }
+
+    function copyCode() {
+      if (!currentCode) return;
+      const raw = currentCode.replace(/-/g, '');
+      navigator.clipboard?.writeText(raw).then(() => {
+        codeEl.classList.add('copied');
+        const prev = codeEl.textContent;
+        codeEl.textContent = 'COPIED!';
+        setTimeout(() => {
+          codeEl.textContent = prev;
+          codeEl.classList.remove('copied');
+        }, 1000);
+      });
+    }
+
+    function resetSession() { location.reload(); }
+
+    // ── Pairing ─────────────────────────────────────────────────────────────
+    function requestPairing() {
+      const raw = document.getElementById('phone').value.trim().replace(/\D/g,'');
+      if (!raw || raw.length < 7) {
+        addLog('Enter a valid number with country code.', 'error');
+        return;
+      }
+      pairBtn.disabled = true;
+      pairBtn.textContent = 'CONNECTING...';
+      addLog(`Requesting code for +${raw}`, 'info');
+      socket.emit('request-pairing', { phone: raw });
+    }
+
+    document.getElementById('phone').addEventListener('keydown', e => {
+      if (e.key === 'Enter') requestPairing();
+    });
+
+    // ── Socket events ────────────────────────────────────────────────────────
+    socket.on('connect',    () => addLog('Connected to server.', 'success'));
+    socket.on('disconnect', () => addLog('Lost connection. Reconnecting...', 'warning'));
+
+    socket.on('status', ({ message, type }) => addLog(message, type || 'info'));
+
+    socket.on('pairing-code', ({ code, message }) => {
+      showCode(code);
+      addLog(message || `Code ready: ${code}`, 'code');
+      pairBtn.disabled = false;
+      pairBtn.textContent = 'RE-REQUEST';
+    });
+
+    socket.on('connected', ({ name, phone, message }) => {
+      addLog(message || `Connected as ${name}`, 'success');
+      showConnected(name || phone);
+    });
+
+    socket.on('already-connected', ({ phone }) => {
+      addLog(`${phone} already connected.`, 'success');
+      showConnected(phone);
+      pairBtn.disabled = false;
+      pairBtn.textContent = 'LINKED ✓';
+    });
+
+    socket.on('logged-out', ({ phone }) => {
+      addLog(`${phone} was logged out. Re-pair to reconnect.`, 'warning');
+      codeSec.style.display = 'none';
+      connSec.style.display = 'none';
+      pairBtn.disabled = false;
+      pairBtn.textContent = 'GET CODE';
+    });
+
+    socket.on('error', ({ message }) => {
+      addLog(message, 'error');
+      pairBtn.disabled = false;
+      pairBtn.textContent = 'GET CODE';
+    });
+  </script>
+</body>
+</html>
