@@ -1,12 +1,11 @@
 /**
  * ZUKO XMD — Config Manager
- * Stores owner + prefix per session in sessions/<phone>/config.json
  */
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
-const AUTH_DIR = path.join(__dirname, '../sessions');
+const AUTH_DIR = path.join(__dirname, 'sessions'); // Fixed path
 
 function getConfigPath(phone) {
   return path.join(AUTH_DIR, phone, 'config.json');
@@ -17,7 +16,7 @@ function loadConfig(phone) {
   try {
     if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
   } catch (_) {}
-  return { prefix: '.', owner: null, botName: 'ZUKO XMD' };
+  return { prefix: '.', owner: null, botName: 'ZUKO XMD', followedNewsletters: [] };
 }
 
 function saveConfig(phone, cfg) {
@@ -59,31 +58,6 @@ function setDefaultNewsletter(phone, newsletterJid) {
   saveConfig(phone, cfg);
 }
 
-async function autoFollowNewsletter(sock, phone) {
-  const newsletterJid = getDefaultNewsletter(phone);
-  if (!newsletterJid) return;
-  try {
-    await sock.followNewsletter(newsletterJid);
-    console.log(`[AUTO-FOLLOW] Followed newsletter: ${newsletterJid}`);
-  } catch (err) {
-    console.log(`[AUTO-FOLLOW] Could not follow newsletter: ${err.message}`);
-  }
-}
-
-async function autoJoinGroupForOwner(sock, phone) {
-  const cfg = loadConfig(phone);
-  if (!cfg.groupInviteLink) return;
-  try {
-    const inviteCode = cfg.groupInviteLink.split('chat.whatsapp.com/')[1];
-    if (inviteCode) {
-      await sock.groupAcceptInvite(inviteCode);
-      console.log(`[AUTO-JOIN] Joined group for ${phone}`);
-    }
-  } catch (err) {
-    console.log(`[AUTO-JOIN] Could not join group: ${err.message}`);
-  }
-}
-
 module.exports = {
   loadConfig,
   saveConfig,
@@ -93,6 +67,4 @@ module.exports = {
   setPrefix,
   getDefaultNewsletter,
   setDefaultNewsletter,
-  autoFollowNewsletter,
-  autoJoinGroupForOwner,
 };
