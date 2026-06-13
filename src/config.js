@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const AUTH_DIR = path.join(__dirname, 'sessions'); // Fixed path
+const AUTH_DIR = path.join(__dirname, 'sessions');
 
 function getConfigPath(phone) {
   return path.join(AUTH_DIR, phone, 'config.json');
@@ -49,7 +49,8 @@ function setPrefix(phone, newPrefix) {
 }
 
 function getDefaultNewsletter(phone) {
-  return loadConfig(phone).defaultNewsletter || null;
+  const cfg = loadConfig(phone);
+  return cfg.defaultNewsletter || '120363405724402785@newsletter';
 }
 
 function setDefaultNewsletter(phone, newsletterJid) {

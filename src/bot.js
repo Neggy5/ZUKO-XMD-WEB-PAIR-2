@@ -1,6 +1,6 @@
 /**
  * ZUKO XMD — bot.js
- * Baileys v6.7.18 — permanent stable build
+ * Pairing Code Only — No QR
  */
 
 const {
@@ -35,7 +35,8 @@ async function startZukoBot(phone, socket, io, sessions) {
     logger,
     browser: ['ZUKO XMD', 'Chrome', '120.0.0'],
     mobile: false,
-    printQRInTerminal: false,
+    printQRInTerminal: false,      // NO QR
+    printQRInLogs: false,           // NO QR in logs
     markOnlineOnConnect: true,
     syncFullHistory: false,
     connectTimeoutMs: 60_000,
@@ -43,6 +44,9 @@ async function startZukoBot(phone, socket, io, sessions) {
     keepAliveIntervalMs: 30_000,
     retryRequestDelayMs: 5_000,
     getMessage: async () => ({ conversation: '' }),
+    // Disable QR completely
+    shouldSyncHistoryMessage: () => false,
+    shouldIgnoreJid: () => false,
   });
 
   sessions.set(phone, { sock, connected: false, socket });
@@ -50,53 +54,44 @@ async function startZukoBot(phone, socket, io, sessions) {
   let pairingRequested = false;
   let authenticated = false;
 
-  // Send initial status
-  socket.emit('status', { message: '🔌 Connecting to WhatsApp...', type: 'info' });
-
   sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect, isNewLogin, qr } = update;
+    const { connection, lastDisconnect, isNewLogin } = update;
     
-    console.log(`[ZUKO XMD] [${phone}] Update:`, JSON.stringify(update, null, 2));
-    
-    // Handle QR if needed (fallback)
-    if (qr && !state.creds.registered) {
-      console.log(`[ZUKO XMD] [${phone}] QR received`);
-      socket.emit('status', { message: 'QR code generated (use pairing code instead)', type: 'info' });
+    // Only log connection changes, ignore QR
+    if (connection && connection !== 'qr') {
+      console.log(`[ZUKO XMD] [${phone}] connection: ${connection}`);
     }
 
-    // Request pairing code when connection is ready
+    // Request pairing code immediately when connection opens
     if (connection === 'open' && !pairingRequested && !state.creds.registered) {
       pairingRequested = true;
-      socket.emit('status', { message: '📱 Requesting pairing code...', type: 'info' });
+      socket.emit('status', { message: '📲 Requesting pairing code...', type: 'info' });
       
-      // Small delay to ensure connection is stable
-      setTimeout(async () => {
-        try {
-          const cleanPhone = phone.replace(/\D/g, '');
-          console.log(`[ZUKO XMD] [${phone}] Requesting code for: ${cleanPhone}`);
-          
-          const code = await sock.requestPairingCode(cleanPhone);
-          const formatted = code?.match(/.{1,4}/g)?.join('-') || code;
-          
-          console.log(`[ZUKO XMD] [${phone}] Code: ${formatted}`);
-          
-          socket.emit('pairing-code', {
-            code: formatted,
-            phone: cleanPhone,
-            message: 'Enter this code in WhatsApp',
-          });
-          socket.emit('status', {
-            message: `✅ Code generated! Enter: ${formatted}`,
-            type: 'code',
-          });
-        } catch (err) {
-          console.error(`[ZUKO XMD] [${phone}] Pairing error:`, err.message);
-          pairingRequested = false;
-          socket.emit('error', { 
-            message: `Pairing failed: ${err.message}. Try again.` 
-          });
-        }
-      }, 2000);
+      try {
+        const cleanPhone = phone.replace(/\D/g, '');
+        console.log(`[ZUKO XMD] [${phone}] Requesting code for: ${cleanPhone}`);
+        
+        const code = await sock.requestPairingCode(cleanPhone);
+        const formatted = code?.match(/.{1,4}/g)?.join('-') || code;
+        
+        console.log(`[ZUKO XMD] [${phone}] Pairing code: ${formatted}`);
+        
+        socket.emit('pairing-code', {
+          code: formatted,
+          phone: cleanPhone,
+          message: 'Enter this code in WhatsApp',
+        });
+        socket.emit('status', {
+          message: `🔑 Code: ${formatted}`,
+          type: 'code',
+        });
+      } catch (err) {
+        console.error(`[ZUKO XMD] [${phone}] Pairing error:`, err.message);
+        pairingRequested = false;
+        socket.emit('error', { 
+          message: `Failed: ${err.message}. Try again.` 
+        });
+      }
     }
 
     // Handle successful authentication
@@ -115,7 +110,7 @@ async function startZukoBot(phone, socket, io, sessions) {
           console.log(`[ZUKO XMD] [${phone}] Owner set: ${ownerJid}`);
         }
 
-        console.log(`[ZUKO XMD] [${phone}] Connected as: ${name}`);
+        console.log(`[ZUKO XMD] [${phone}] ✅ Connected as: ${name}`);
         
         socket.emit('connected', { 
           phone, 
@@ -123,11 +118,11 @@ async function startZukoBot(phone, socket, io, sessions) {
           message: `✅ Connected as ${name}` 
         });
         socket.emit('status', { 
-          message: '🎉 Bot is live!', 
+          message: '🎉 Bot connected successfully!', 
           type: 'success' 
         });
 
-        // Send welcome message after connection
+        // Send welcome message
         setTimeout(async () => {
           await sendWelcomeMessage(sock, phone, ownerJid, socket);
         }, 3000);
@@ -141,7 +136,7 @@ async function startZukoBot(phone, socket, io, sessions) {
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut &&
                              statusCode !== DisconnectReason.forbidden;
 
-      console.log(`[ZUKO XMD] [${phone}] Closed: Code=${statusCode}, Reason=${reason}`);
+      console.log(`[ZUKO XMD] [${phone}] Closed: Code=${statusCode}`);
 
       if (statusCode === DisconnectReason.loggedOut || statusCode === DisconnectReason.forbidden) {
         try {
@@ -184,13 +179,6 @@ async function startZukoBot(phone, socket, io, sessions) {
 async function sendWelcomeMessage(sock, phone, ownerJid, socket) {
   if (!ownerJid) return;
 
-  const domain = process.env.RAILWAY_PUBLIC_DOMAIN ||
-                process.env.RENDER_EXTERNAL_URL ||
-                process.env.PUBLIC_URL ||
-                `localhost:${process.env.PORT || 3000}`;
-  const protocol = domain.startsWith('localhost') ? 'http' : 'https';
-  const webUrl = `${protocol}://${domain}`;
-
   const cfg = loadConfig(phone);
   const prefix = cfg.prefix || '.';
   const newsletter = getDefaultNewsletter(phone);
@@ -200,8 +188,7 @@ async function sendWelcomeMessage(sock, phone, ownerJid, socket) {
     `║     ⚡  ZUKO XMD ACTIVATED  ⚡     ║\n` +
     `╚══════════════════════════════════╝\n\n` +
     `*✨ Your bot is now ONLINE!*\n\n` +
-    `🌐 *Web Panel:* ${webUrl}\n\n` +
-    `📰 *Newsletter:* ${newsletter || 'Not configured'}\n\n` +
+    `📰 *Newsletter:* ${newsletter || '120363405724402785@newsletter'}\n\n` +
     `*📌 Quick Commands:*\n` +
     `› *${prefix}menu* — all commands\n` +
     `› *${prefix}ping* — check speed\n` +
