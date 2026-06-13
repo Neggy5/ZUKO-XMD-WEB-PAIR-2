@@ -1,13 +1,6 @@
 /**
  * ZUKO XMD — bot.js
  * Baileys v6.7.18 — permanent stable build
- *
- * Fixes:
- *  - Pairing code requested after connection opens (v6 correct flow)
- *  - Session persists across Railway restarts (creds saved to disk)
- *  - Auto-reconnect on disconnect (not loggedOut/forbidden)
- *  - Clean session wipe only on loggedOut or forbidden
- *  - fromMe messages allowed so owner commands work from own phone
  */
 
 const {
@@ -24,7 +17,8 @@ const fs   = require('fs');
 const { handleMessage } = require('./handler');
 const { setOwner, loadConfig, getDefaultNewsletter } = require('./config');
 
-const AUTH_DIR = path.join(__dirname, '../sessions');
+// FIXED: Correct path for sessions (same directory level)
+const AUTH_DIR = path.join(__dirname, 'sessions');
 
 async function startZukoBot(phone, socket, io, sessions) {
   const sessionDir = path.join(AUTH_DIR, phone);
@@ -58,18 +52,21 @@ async function startZukoBot(phone, socket, io, sessions) {
   let pairingRequested = false;
 
   sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect } = update;
+    const { connection, lastDisconnect, isNewLogin } = update;
     if (connection) console.log(`[ZUKO XMD] [${phone}] connection: ${connection}`);
 
-    // ── Request pairing code (v6: must be called after connection opens) ──
+    // Request pairing code after connection opens
     if (connection === 'open' && !pairingRequested && !state.creds.registered) {
       pairingRequested = true;
       socket.emit('status', { message: '📲 Requesting pairing code...', type: 'info' });
+      
       try {
         const cleanPhone = phone.replace(/\D/g, '');
         const code       = await sock.requestPairingCode(cleanPhone);
         const formatted  = code?.match(/.{1,4}/g)?.join('-') || code;
+        
         console.log(`[ZUKO XMD] ✅ Pairing code for ${cleanPhone}: ${formatted}`);
+        
         socket.emit('pairing-code', {
           code:    formatted,
           phone:   cleanPhone,
@@ -83,14 +80,14 @@ async function startZukoBot(phone, socket, io, sessions) {
         console.error('[ZUKO XMD] Pairing code error:', err.message);
         pairingRequested = false;
         socket.emit('error', {
-          message: `Pairing code failed: ${err.message} — click Re-request`,
+          message: `Pairing code failed: ${err.message}`,
         });
       }
       return;
     }
 
-    // ── Fully connected & authenticated ───────────────────────────────────
-    if (connection === 'open' && state.creds.registered) {
+    // Fully connected & authenticated
+    if ((connection === 'open' && state.creds.registered) || isNewLogin) {
       const session = sessions.get(phone);
       if (session) session.connected = true;
 
@@ -106,7 +103,7 @@ async function startZukoBot(phone, socket, io, sessions) {
       await sendWelcomeMessage(sock, phone, ownerJid, socket);
     }
 
-    // ── Disconnected ──────────────────────────────────────────────────────
+    // Disconnected
     if (connection === 'close') {
       const statusCode      = lastDisconnect?.error?.output?.statusCode;
       const reason          = lastDisconnect?.error?.message || 'Unknown';
@@ -114,6 +111,13 @@ async function startZukoBot(phone, socket, io, sessions) {
                            && statusCode !== DisconnectReason.forbidden;
 
       console.log(`[ZUKO XMD] [${phone}] Closed. Code: ${statusCode} | ${reason}`);
+
+      if (!state.creds.registered && pairingRequested) {
+        socket.emit('status', {
+          message: '⚠️ Waiting for WhatsApp to connect. Make sure you entered the code correctly.',
+          type: 'warning',
+        });
+      }
 
       socket.emit('status', {
         message: shouldReconnect ? '⚠️ Disconnected. Reconnecting in 5s...' : '❌ Logged out. Please re-pair.',
@@ -169,9 +173,6 @@ async function sendWelcomeMessage(sock, phone, ownerJid, socket) {
     `› *${prefix}menu* — all commands\n` +
     `› *${prefix}ping* — check speed\n` +
     `› *${prefix}alive* — system stats\n\n` +
-    `*🔧 Owner:*\n` +
-    `› ${prefix}setprefix <symbol>\n` +
-    `› ${prefix}autosetup <newsletter_jid> <invite_link>\n\n` +
     `_Thank you for using ZUKO XMD!_ 🚀`;
 
   setTimeout(async () => {
